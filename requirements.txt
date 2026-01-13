@@ -1,0 +1,8 @@
+# Runtime dependencies (installed to run the project)
+numpy>=1.26
+manim>=0.18
+pytest>=7.0
+ruff>=0.5
+black>=24.0
+mypy>=1.8
+pip-tools>=7.4
