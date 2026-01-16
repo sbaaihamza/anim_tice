@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Tuple, Callable, Dict, Literal
+from dataclasses import dataclass
+from typing import Dict, Literal
 
 import numpy as np
 from manim import *
+
+from anim_tice.core import AnimTiceScene, LessonConfig, StyleConfig
 
 
 # ============================================================
@@ -12,7 +14,7 @@ from manim import *
 # ============================================================
 
 @dataclass
-class RulerLessonStyle:
+class RulerLessonStyle(StyleConfig):
     # ruler visuals
     ruler_length: float = 7.0
     ruler_height: float = 0.75
@@ -27,14 +29,9 @@ class RulerLessonStyle:
     point_radius: float = 0.10
 
     # text
-    font_size_title: int = 38
-    font_size_main: int = 34
     font_size_small: int = 28
 
     # pacing
-    pause: float = 0.45
-    rt_fast: float = 0.7
-    rt_norm: float = 1.0
     rt_slow: float = 1.25
 
     # toggles
@@ -53,12 +50,11 @@ class RulerLessonStyle:
 
 
 @dataclass
-class LessonConfigM3_G05:
+class LessonConfigM3_G05(LessonConfig):
     title_en: str = "Using a ruler to construct line segments and lines"
     title_ar: str = "استعمال المسطرة لإنشاء قطع ومستقيمات"
     domain_en: str = "Geometry"
     domain_ar: str = "الهندسة"
-    language: str = "en"
 
     # prompts
     p_explore_en: str = "Exploration: freehand vs ruler."
@@ -95,6 +91,7 @@ class Ruler(VGroup):
     - optional ticks
     - you can align it to two points and slide/rotate it
     """
+
     def __init__(self, style: RulerLessonStyle, with_ticks: bool = True):
         super().__init__()
         self.s = style
@@ -116,8 +113,8 @@ class Ruler(VGroup):
                 long = (i % 5 == 0)
                 h = style.ruler_height * (0.45 if long else 0.28)
                 t = Line(
-                    np.array([x, -style.ruler_height/2, 0]),
-                    np.array([x, -style.ruler_height/2 + h, 0]),
+                    np.array([x, -style.ruler_height / 2, 0]),
+                    np.array([x, -style.ruler_height / 2 + h, 0]),
                     stroke_width=style.tick_stroke
                 ).set_opacity(0.75)
                 ticks.add(t)
@@ -172,7 +169,7 @@ class Ruler(VGroup):
 # MAIN SCENE
 # ============================================================
 
-class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
+class M3_G05_Ruler_Construct_Segments_And_Lines(AnimTiceScene):
     """
     M3_G05 — Using a ruler to construct line segments and lines:
       - contrast freehand vs ruler
@@ -186,47 +183,32 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
 
     def __init__(
         self,
-        cfg: LessonConfigM3_G05 = LessonConfigM3_G05(),
-        style: RulerLessonStyle = RulerLessonStyle(),
+        lesson_config: LessonConfigM3_G05 = LessonConfigM3_G05(),
+        style_config: RulerLessonStyle = RulerLessonStyle(),
         **kwargs
     ):
-        super().__init__(**kwargs)
-        self.cfg = cfg
-        self.s = style
+        super().__init__(
+            lesson_config=lesson_config,
+            style_config=style_config,
+            **kwargs
+        )
 
-    def banner(self, mob: Mobject) -> Mobject:
-        mob.to_edge(UP)
-        return mob
-
-    def construct(self):
-        # title
-        title = Text(
-            self.cfg.title_en if self.cfg.language == "en" else self.cfg.title_ar,
-            font_size=self.s.font_size_title
-        ).scale(0.8)
-        title = self.banner(title)
-        self.play(Write(title), run_time=self.s.rt_norm)
-        self.title = title
-
-        # 1) exploration: freehand vs ruler
+    def build_steps(self):
+        self.steps = [
+            ("intro", self.step_intro),
+        ]
         if self.s.show_freehand_contrast:
-            self.step_freehand_vs_ruler()
+            self.steps.append(("freehand_vs_ruler", self.step_freehand_vs_ruler))
 
-        # 2) construct a segment AB with ruler
-        segment_pack = self.step_construct_segment()
+        self.steps.extend([
+            ("construct_segment", self.step_construct_segment),
+            ("extend_to_line", self.step_extend_to_line),
+            ("institutionalization", self.step_institutionalization),
+        ])
 
-        # 3) extend to full line
-        self.step_extend_to_line(segment_pack)
-
-        # 4) institutionalization (summary)
-        self.step_institutionalization()
-
-        # cleanup
-        self.play(FadeOut(self.title), run_time=self.s.rt_fast)
-
-    # ============================================================
-    # Steps
-    # ============================================================
+    def step_intro(self):
+        # The base class handles the title, so this can be a placeholder or for additional intro animations.
+        pass
 
     def step_freehand_vs_ruler(self):
         p = self._prompt(self.cfg.p_explore_en, self.cfg.p_explore_ar)
@@ -258,8 +240,8 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
         cap2 = Text("with ruler", font_size=self.s.font_size_small).scale(0.55).next_to(straight, DOWN, buff=0.18)
 
         self.play(FadeIn(dA), FadeIn(dB), FadeIn(lA), FadeIn(lB), run_time=self.s.rt_fast)
-        self.play(Create(freehand), FadeIn(cap1, shift=UP*0.05), run_time=self.s.rt_norm)
-        self.play(Create(straight), FadeIn(cap2, shift=UP*0.05), run_time=self.s.rt_norm)
+        self.play(Create(freehand), FadeIn(cap1, shift=UP * 0.05), run_time=self.s.rt_norm)
+        self.play(Create(straight), FadeIn(cap2, shift=UP * 0.05), run_time=self.s.rt_norm)
 
         # emphasize "precision"
         self.play(freehand.animate.set_opacity(0.35), run_time=self.s.rt_fast)
@@ -285,7 +267,7 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
         # ruler enters
         ruler = Ruler(self.s, with_ticks=self.s.show_ticks)
         ruler.move_to(np.array([0, self.s.work_y + 1.7, 0]))
-        self.play(FadeIn(ruler, shift=DOWN*0.12), run_time=self.s.rt_norm)
+        self.play(FadeIn(ruler, shift=DOWN * 0.12), run_time=self.s.rt_norm)
 
         # align ruler to A-B
         ruler_target = ruler.copy().align_to_points(A, B, edge="bottom")
@@ -313,21 +295,20 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
             expr = MathTex(r"\overline{%s%s}" % (self.cfg.A_name, self.cfg.B_name)).scale(1.0)
             expr.next_to(seg, DOWN, buff=0.35)
             notation = expr
-            self.play(FadeIn(notation, shift=UP*0.05), run_time=self.s.rt_fast)
+            self.play(FadeIn(notation, shift=UP * 0.05), run_time=self.s.rt_fast)
 
         # verification: show edge contact
         verify_pack = VGroup()
         if self.s.show_verification:
             verify = Text("Aligned edge → straight segment", font_size=self.s.font_size_small).scale(0.52)
-            verify.to_edge(DOWN).shift(UP*0.2)
+            verify.to_edge(DOWN).shift(UP * 0.2)
             # show faint edge line overlay
             edge_line = ruler.tracing_edge_line("bottom").set_stroke(width=self.s.helper_stroke).set_opacity(0.35)
             verify_pack = VGroup(edge_line, verify)
             self.play(FadeIn(edge_line), FadeIn(verify), run_time=self.s.rt_fast)
 
         self.wait(0.35)
-
-        return {
+        self.segment_pack = {
             "ruler": ruler,
             "A": dA, "B": dB, "lA": lA, "lB": lB,
             "segment": seg,
@@ -336,7 +317,8 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
             "verify_pack": verify_pack
         }
 
-    def step_extend_to_line(self, pack: Dict[str, Mobject]):
+    def step_extend_to_line(self):
+        pack = self.segment_pack
         p = self._prompt(self.cfg.p_line_en, self.cfg.p_line_ar)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -348,7 +330,7 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
         v = B - A
         v = v / (np.linalg.norm(v) + 1e-9)
         mid = (A + B) / 2
-        long_line = Line(mid - v*6.0, mid + v*6.0).set_stroke(width=self.s.line_stroke).set_opacity(0.8)
+        long_line = Line(mid - v * 6.0, mid + v * 6.0).set_stroke(width=self.s.line_stroke).set_opacity(0.8)
 
         # keep segment emphasized, then swap to long line (segment remains visible as thick overlay)
         seg_emph = seg.copy().set_stroke(width=self.s.line_stroke + 2)
@@ -356,15 +338,17 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
         self.play(Transform(seg, long_line), run_time=self.s.rt_norm)
 
         # add arrows to suggest extension both ways
-        arrL = Arrow(long_line.get_center(), long_line.get_start(), buff=0.0, stroke_width=self.s.helper_stroke).set_opacity(0.5)
-        arrR = Arrow(long_line.get_center(), long_line.get_end(), buff=0.0, stroke_width=self.s.helper_stroke).set_opacity(0.5)
+        arrL = Arrow(long_line.get_center(), long_line.get_start(), buff=0.0,
+                     stroke_width=self.s.helper_stroke).set_opacity(0.5)
+        arrR = Arrow(long_line.get_center(), long_line.get_end(), buff=0.0,
+                     stroke_width=self.s.helper_stroke).set_opacity(0.5)
         self.play(FadeIn(arrL), FadeIn(arrR), run_time=self.s.rt_fast)
 
         # optional: line notation
         if self.s.show_notation:
             line_note = Text("line: extends both directions", font_size=self.s.font_size_small).scale(0.5)
             line_note.next_to(long_line, UP, buff=0.25)
-            self.play(FadeIn(line_note, shift=UP*0.05), run_time=self.s.rt_fast)
+            self.play(FadeIn(line_note, shift=UP * 0.05), run_time=self.s.rt_fast)
             self.wait(0.25)
             self.play(FadeOut(line_note), run_time=self.s.rt_fast)
 
@@ -414,23 +398,19 @@ class M3_G05_Ruler_Construct_Segments_And_Lines(Scene):
             .arrange(DOWN, aligned_edge=LEFT, buff=0.14) \
             .move_to(box.get_center())
 
-        self.play(FadeIn(VGroup(box, txt), shift=UP*0.08), run_time=self.s.rt_norm)
+        self.play(FadeIn(VGroup(box, txt), shift=UP * 0.08), run_time=self.s.rt_norm)
         self.wait(0.55)
         self.play(FadeOut(VGroup(box, txt)), run_time=self.s.rt_fast)
 
-    # ============================================================
-    # Utility
-    # ============================================================
-
     def _prompt(self, en: str, ar: str) -> Mobject:
-        prompt = T(self.cfg, self.s, en, ar, scale=0.52)
+        prompt = self.t(en, ar, scale=0.52)
         prompt = self.banner(prompt).shift(DOWN * self.s.title_y_shift)
         return prompt
 
 
 # ============================================================
 # RUN:
-#   manim -pqh your_file.py M3_G05_Ruler_Construct_Segments_And_Lines
+#   manim -pqh M3_G05_Ruler_Construct_Segments_And_Lines.py M3_G05_Ruler_Construct_Segments_And_Lines
 #
 # EXTEND IDEAS:
 #   - Add "given length" segment: show a tick-scale on ruler and a target length label.

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Callable, Dict
+from typing import List, Tuple, Callable
 
 import numpy as np
 from manim import *
+
+from anim_tice.core import AnimTiceScene, LessonConfig, StyleConfig
 
 
 # ============================================================
@@ -12,21 +14,16 @@ from manim import *
 # ============================================================
 
 @dataclass
-class FractionStyle:
+class FractionStyle(StyleConfig):
     # Visual sizing
     shape_scale: float = 1.15
     stroke_width: float = 4.0
     fill_opacity: float = 0.20
 
     # Text
-    font_size_title: int = 38
-    font_size_main: int = 34
     font_size_small: int = 28
 
     # Animation pacing
-    pause: float = 0.45
-    rt_fast: float = 0.7
-    rt_norm: float = 1.0
     rt_slow: float = 1.25
 
     # Layout toggles
@@ -53,10 +50,9 @@ class FractionExample:
 
 
 @dataclass
-class LessonConfigM3_L04:
+class LessonConfigM3_L04(LessonConfig):
     title_en: str = "Fractions: representation and reading"
     title_ar: str = "الأعداد الكسرية: تمثيل وقراءة"
-    language: str = "en"  # "en" | "ar"
 
     # Guided prompts (verbal layer)
     prompt_observe_en: str = "Observe: Is the whole divided into equal parts?"
@@ -82,11 +78,6 @@ class LessonConfigM3_L04:
 # ============================================================
 # REUSABLE PRIMITIVES
 # ============================================================
-
-def t(cfg: LessonConfigM3_L04, s: FractionStyle, en: str, ar: Optional[str] = None, scale: float = 0.6) -> Mobject:
-    txt = en if cfg.language == "en" else (ar or en)
-    return Text(txt, font_size=s.font_size_main).scale(scale)
-
 
 def fraction_tex(n: int, d: int, scale: float = 1.2) -> Mobject:
     return MathTex(rf"\frac{{{n}}}{{{d}}}").scale(scale)
@@ -126,7 +117,7 @@ class PartitionedCircle(VGroup):
             start = i * TAU / self.d
             end = (i + 1) * TAU / self.d
             sec = Sector(
-                outer_radius=self.radius,
+                radius=self.radius,
                 start_angle=start,
                 angle=(end - start),
             ).set_stroke(width=0).set_fill(opacity=0.0)
@@ -230,7 +221,7 @@ class SegmentedBar(VGroup):
 # LESSON SCENE (Reusable / Adjustable / Extensible)
 # ============================================================
 
-class M3_L04_FractionsRepresentationAndReading(Scene):
+class M3_L04_FractionsRepresentationAndReading(AnimTiceScene):
     """
     M3_L04 — Fractions: representation and reading
 
@@ -248,24 +239,16 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
 
     def __init__(
         self,
-        cfg: LessonConfigM3_L04 = LessonConfigM3_L04(),
-        style: FractionStyle = FractionStyle(),
+        lesson_config: LessonConfigM3_L04 = LessonConfigM3_L04(),
+        style_config: FractionStyle = FractionStyle(),
         **kwargs
     ):
-        super().__init__(**kwargs)
-        self.cfg = cfg
-        self.s = style
+        super().__init__(
+            lesson_config=lesson_config,
+            style_config=style_config,
+            **kwargs
+        )
         self.steps: List[Tuple[str, Callable[[], None]]] = []
-
-    # ----------------------------
-    # Orchestrator
-    # ----------------------------
-
-    def construct(self):
-        self.build_steps()
-        for _, fn in self.steps:
-            fn()
-            self.wait(self.s.pause)
 
     def build_steps(self):
         self.steps = [
@@ -277,30 +260,16 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
             ("outro", self.step_outro),
         ]
 
-    # ----------------------------
-    # Helpers
-    # ----------------------------
-
-    def banner(self, mob: Mobject) -> Mobject:
-        mob.to_edge(UP)
-        return mob
-
     def step_intro(self):
-        title = t(self.cfg, self.s, self.cfg.title_en, self.cfg.title_ar, scale=0.62)
-        title = self.banner(title)
-
-        subtitle = t(
-            self.cfg, self.s,
+        subtitle = self.t(
             "Whole → equal parts → selected parts → fraction",
             "الكل → أجزاء متساوية → أجزاء مختارة → كسر",
             scale=0.52
-        ).next_to(title, DOWN, buff=0.18)
+        ).next_to(self.title, DOWN, buff=0.18)
 
-        self.play(Write(title), FadeIn(subtitle, shift=DOWN * 0.15), run_time=self.s.rt_norm)
+        self.play(FadeIn(subtitle, shift=DOWN * 0.15), run_time=self.s.rt_norm)
         self.wait(0.2)
         self.play(FadeOut(subtitle, shift=UP * 0.1), run_time=self.s.rt_fast)
-
-        self.title = title
 
     def build_visual(self, ex: FractionExample) -> Tuple[Mobject, VGroup, VGroup]:
         """
@@ -334,15 +303,11 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
             chosen.add(p)
         return chosen
 
-    # ============================================================
-    # Steps
-    # ============================================================
-
     def step_exploration_examples(self):
         """
         Exploration: everyday sharing situations (pizza, bar, segment)
         """
-        prompt = t(self.cfg, self.s, self.cfg.prompt_observe_en, self.cfg.prompt_observe_ar, scale=0.55)
+        prompt = self.t(self.cfg.prompt_observe_en, self.cfg.prompt_observe_ar, scale=0.55)
         prompt = self.banner(prompt).shift(DOWN * 0.9)
         self.play(Transform(self.title, prompt), run_time=self.s.rt_fast)
 
@@ -353,7 +318,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
             base.scale(self.s.shape_scale).move_to(ORIGIN + DOWN * 0.1)
 
             # Step flow: show whole object
-            label = t(self.cfg, self.s, ex.name.title(), ex.name, scale=0.55).to_edge(LEFT).shift(UP * 0.3)
+            label = self.t(ex.name.title(), ex.name, scale=0.55).to_edge(LEFT).shift(UP * 0.3)
 
             self.play(FadeIn(label, shift=RIGHT * 0.15), run_time=self.s.rt_fast)
             self.play(Create(base), run_time=self.s.rt_norm)
@@ -365,7 +330,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
             self.play(base.animate.set_stroke(width=self.s.stroke_width), run_time=0.25)
 
             # Ask: total parts (denominator)
-            ask_total = t(self.cfg, self.s, self.cfg.prompt_name_en, self.cfg.prompt_name_ar, scale=0.52).to_edge(DOWN)
+            ask_total = self.t(self.cfg.prompt_name_en, self.cfg.prompt_name_ar, scale=0.52).to_edge(DOWN)
             d_label = Text(f"{ex.denominator}", font_size=self.s.font_size_title).next_to(ask_total, UP, buff=0.15)
 
             self.play(FadeIn(ask_total, shift=UP * 0.1), FadeIn(d_label, shift=UP * 0.1), run_time=self.s.rt_norm)
@@ -373,7 +338,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
             self.play(FadeOut(ask_total), FadeOut(d_label), run_time=self.s.rt_fast)
 
             # Highlight selected parts (numerator)
-            ask_taken = t(self.cfg, self.s, self.cfg.prompt_taken_en, self.cfg.prompt_taken_ar, scale=0.52).to_edge(DOWN)
+            ask_taken = self.t(self.cfg.prompt_taken_en, self.cfg.prompt_taken_ar, scale=0.52).to_edge(DOWN)
             self.play(FadeIn(ask_taken, shift=UP * 0.1), run_time=self.s.rt_fast)
 
             chosen = self.highlight_parts(parts, ex.numerator)
@@ -385,7 +350,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
             self.play(FadeOut(ask_taken), run_time=self.s.rt_fast)
 
             # Introduce symbol LAST (but for exploration we can keep it subtle)
-            sym_prompt = t(self.cfg, self.s, self.cfg.prompt_symbol_en, self.cfg.prompt_symbol_ar, scale=0.52).to_edge(DOWN)
+            sym_prompt = self.t(self.cfg.prompt_symbol_en, self.cfg.prompt_symbol_ar, scale=0.52).to_edge(DOWN)
             frac = fraction_tex(ex.numerator, ex.denominator, scale=1.3).next_to(sym_prompt, UP, buff=0.18)
             self.play(FadeIn(sym_prompt, shift=UP * 0.1), Write(frac), run_time=self.s.rt_norm)
             self.wait(0.2)
@@ -401,8 +366,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
         """
         Compare representations: same fraction concept, different shapes.
         """
-        prompt = t(
-            self.cfg, self.s,
+        prompt = self.t(
             "Discussion: Different pictures, same idea (equal parts).",
             "نقاش: صور مختلفة، نفس الفكرة (أجزاء متساوية).",
             scale=0.55
@@ -437,8 +401,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
         self.play(Create(base1), FadeIn(chosen1), Write(frac1), run_time=self.s.rt_norm)
         self.play(Create(base2), FadeIn(chosen2), Write(frac2), run_time=self.s.rt_norm)
 
-        focus = t(
-            self.cfg, self.s,
+        focus = self.t(
             "What matters: equal parts + how many parts taken.",
             "المهم: أجزاء متساوية + عدد الأجزاء المأخوذة.",
             scale=0.52
@@ -453,8 +416,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
         """
         Formalize numerator/denominator meaning with visuals (no abstract rule first).
         """
-        prompt = t(
-            self.cfg, self.s,
+        prompt = self.t(
             "Institutionalization: numerator / denominator",
             "التثبيت: البسط / المقام",
             scale=0.58
@@ -477,8 +439,8 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
         # Labels pointing to numerator/denominator
         num_box = SurroundingRectangle(frac[0][0], buff=0.08)  # numerator glyph group
         den_box = SurroundingRectangle(frac[0][2], buff=0.08)  # denominator glyph group (layout: \frac{a}{b})
-        num_lab = t(self.cfg, self.s, "numerator = parts taken", "البسط = الأجزاء المأخوذة", scale=0.50).next_to(num_box, UP, buff=0.15)
-        den_lab = t(self.cfg, self.s, "denominator = equal parts in whole", "المقام = عدد الأجزاء المتساوية", scale=0.50).next_to(den_box, DOWN, buff=0.15)
+        num_lab = self.t("numerator = parts taken", "البسط = الأجزاء المأخوذة", scale=0.50).next_to(num_box, UP, buff=0.15)
+        den_lab = self.t("denominator = equal parts in whole", "المقام = عدد الأجزاء المتساوية", scale=0.50).next_to(den_box, DOWN, buff=0.15)
 
         self.play(Create(base), FadeIn(chosen), run_time=self.s.rt_norm)
         self.play(Write(frac), run_time=self.s.rt_norm)
@@ -486,8 +448,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
         self.play(Create(den_box), FadeIn(den_lab, shift=DOWN * 0.1), run_time=self.s.rt_norm)
 
         # Freeze on key rule
-        rule = t(
-            self.cfg, self.s,
+        rule = self.t(
             "Fraction = (taken parts) / (equal parts in the whole)",
             "الكسر = (الأجزاء المأخوذة) / (الأجزاء المتساوية في الكل)",
             scale=0.52
@@ -502,8 +463,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
         """
         Formative: match picture to fraction (simple).
         """
-        prompt = t(
-            self.cfg, self.s,
+        prompt = self.t(
             "Mini-check: Which fraction matches the picture?",
             "تحقق صغير: أي كسر يوافق الصورة؟",
             scale=0.55
@@ -531,7 +491,7 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
 
         # reveal correct
         box = SurroundingRectangle(opt2, buff=0.12)
-        ok = t(self.cfg, self.s, "Correct!", "صحيح!", scale=0.55).next_to(box, DOWN, buff=0.2)
+        ok = self.t("Correct!", "صحيح!", scale=0.55).next_to(box, DOWN, buff=0.2)
         self.play(Create(box), FadeIn(ok, shift=UP * 0.1), run_time=self.s.rt_norm)
         self.wait(0.3)
 
@@ -539,22 +499,22 @@ class M3_L04_FractionsRepresentationAndReading(Scene):
 
     def step_outro(self):
         recap = VGroup(
-            t(self.cfg, self.s, "Recap:", "الخلاصة:", scale=0.6),
-            t(self.cfg, self.s, "• Fractions mean equal parts of a whole", "• الكسر يعني أجزاء متساوية من كل", scale=0.50),
-            t(self.cfg, self.s, "• Denominator: total equal parts", "• المقام: عدد الأجزاء المتساوية", scale=0.50),
-            t(self.cfg, self.s, "• Numerator: parts taken", "• البسط: الأجزاء المأخوذة", scale=0.50),
-            t(self.cfg, self.s, "• Read the fraction correctly", "• نقرأ الكسر بشكل صحيح", scale=0.50),
+            self.t("Recap:", "الخلاصة:", scale=0.6),
+            self.t("• Fractions mean equal parts of a whole", "• الكسر يعني أجزاء متساوية من كل", scale=0.50),
+            self.t("• Denominator: total equal parts", "• المقام: عدد الأجزاء المتساوية", scale=0.50),
+            self.t("• Numerator: parts taken", "• البسط: الأجزاء المأخوذة", scale=0.50),
+            self.t("• Read the fraction correctly", "• نقرأ الكسر بشكل صحيح", scale=0.50),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.18)
 
         recap.to_edge(RIGHT).shift(DOWN * 0.2)
         self.play(FadeIn(recap, shift=LEFT * 0.2), run_time=self.s.rt_norm)
         self.wait(0.6)
-        self.play(FadeOut(recap, shift=RIGHT * 0.2), FadeOut(self.title), run_time=self.s.rt_fast)
+        self.play(FadeOut(recap, shift=RIGHT * 0.2), run_time=self.s.rt_fast)
 
 
 # ============================================================
 # RUN:
-#   manim -pqh your_file.py M3_L04_FractionsRepresentationAndReading
+#   manim -pqh M3_L04_FractionsRepresentationAndReading.py M3_L04_FractionsRepresentationAndReading
 #
 # CUSTOMIZE EXAMPLES:
 #   cfg = LessonConfigM3_L04(

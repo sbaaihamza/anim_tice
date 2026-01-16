@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Callable, Dict
+from typing import List, Tuple, Callable, Dict
 
 import numpy as np
 from manim import *
+
+from anim_tice.core import AnimTiceScene, LessonConfig, StyleConfig
 
 
 # ============================================================
@@ -12,7 +14,7 @@ from manim import *
 # ============================================================
 
 @dataclass
-class MeterStyle:
+class MeterStyle(StyleConfig):
     # Visual sizes
     stroke_width: float = 4.0
     fill_opacity: float = 0.18
@@ -27,14 +29,9 @@ class MeterStyle:
     obj_corner_radius: float = 0.18
 
     # text
-    font_size_title: int = 38
-    font_size_main: int = 34
     font_size_small: int = 28
 
     # pacing
-    pause: float = 0.45
-    rt_fast: float = 0.7
-    rt_norm: float = 1.0
     rt_slow: float = 1.25
 
     # toggles
@@ -60,10 +57,9 @@ class ObjectSpec:
 
 
 @dataclass
-class LessonConfigM3_L14:
+class LessonConfigM3_L14(LessonConfig):
     title_en: str = "Units of length measurement: the meter (m)"
     title_ar: str = "وحدات قياس الأطوال: المتر (m)"
-    language: str = "en"  # "en" | "ar"
 
     # prompts
     prompt_compare_en: str = "Can we decide which is longer just by looking?"
@@ -100,11 +96,6 @@ class LessonConfigM3_L14:
 # ============================================================
 # REUSABLE PRIMITIVES
 # ============================================================
-
-def T(cfg: LessonConfigM3_L14, s: MeterStyle, en: str, ar: Optional[str] = None, scale: float = 0.6) -> Mobject:
-    txt = en if cfg.language == "en" else (ar or en)
-    return Text(txt, font_size=s.font_size_main).scale(scale)
-
 
 class SimObject(VGroup):
     """
@@ -192,7 +183,7 @@ def build_iteration_counter(style: MeterStyle, k: int, at: np.ndarray) -> VGroup
 # LESSON SCENE (Reusable / Adjustable / Extensible)
 # ============================================================
 
-class M3_L14_MeterUnitMeasurement(Scene):
+class M3_L14_MeterUnitMeasurement(AnimTiceScene):
     """
     M3_L14 — Units of length measurement: meter (m)
 
@@ -213,24 +204,15 @@ class M3_L14_MeterUnitMeasurement(Scene):
 
     def __init__(
         self,
-        cfg: LessonConfigM3_L14 = LessonConfigM3_L14(),
-        style: MeterStyle = MeterStyle(),
+        lesson_config: LessonConfigM3_L14 = LessonConfigM3_L14(),
+        style_config: MeterStyle = MeterStyle(),
         **kwargs
     ):
-        super().__init__(**kwargs)
-        self.cfg = cfg
-        self.s = style
-        self.steps: List[Tuple[str, Callable[[], None]]] = []
-
-    # ----------------------------
-    # Orchestrator
-    # ----------------------------
-
-    def construct(self):
-        self.build_steps()
-        for _, fn in self.steps:
-            fn()
-            self.wait(self.s.pause)
+        super().__init__(
+            lesson_config=lesson_config,
+            style_config=style_config,
+            **kwargs
+        )
 
     def build_steps(self):
         self.steps = [
@@ -242,35 +224,22 @@ class M3_L14_MeterUnitMeasurement(Scene):
             ("outro", self.step_outro),
         ]
 
-    # ----------------------------
-    # Helpers
-    # ----------------------------
-
-    def banner(self, mob: Mobject) -> Mobject:
-        mob.to_edge(UP)
-        return mob
-
     def step_intro(self):
-        title = T(self.cfg, self.s, self.cfg.title_en, self.cfg.title_ar, scale=0.62)
-        title = self.banner(title)
-
-        subtitle = T(
-            self.cfg, self.s,
+        subtitle = self.t(
             "Estimate vs Measure — we need a standard unit",
             "التقدير vs القياس — نحتاج وحدة معيارية",
             scale=0.52
-        ).next_to(title, DOWN, buff=0.18)
+        ).next_to(self.title, DOWN, buff=0.18)
 
-        self.play(Write(title), FadeIn(subtitle, shift=DOWN * 0.15), run_time=self.s.rt_norm)
+        self.play(FadeIn(subtitle, shift=DOWN * 0.15), run_time=self.s.rt_norm)
         self.wait(0.2)
         self.play(FadeOut(subtitle, shift=UP * 0.1), run_time=self.s.rt_fast)
-        self.title = title
 
     def step_exploration_compare(self):
         """
         Exploration: visual comparison is insufficient → create need for standard unit.
         """
-        p = T(self.cfg, self.s, self.cfg.prompt_compare_en, self.cfg.prompt_compare_ar, scale=0.55)
+        p = self.t(self.cfg.prompt_compare_en, self.cfg.prompt_compare_ar, scale=0.55)
         p = self.banner(p).shift(DOWN * 0.9)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -291,8 +260,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
 
         self.play(FadeIn(self.obj_mobs[0], shift=UP * 0.15), FadeIn(self.obj_mobs[1], shift=DOWN * 0.15), run_time=self.s.rt_norm)
 
-        amb = T(
-            self.cfg, self.s,
+        amb = self.t(
             "Looks confusing… because they are not aligned.",
             "يبدو الأمر محيّراً… لأنهما غير مُحاذيين.",
             scale=0.52
@@ -306,16 +274,16 @@ class M3_L14_MeterUnitMeasurement(Scene):
         """
         Discussion: non-standard units cause different results → shared unit needed.
         """
-        p = T(self.cfg, self.s, self.cfg.prompt_need_unit_en, self.cfg.prompt_need_unit_ar, scale=0.58)
+        p = self.t(self.cfg.prompt_need_unit_en, self.cfg.prompt_need_unit_ar, scale=0.58)
         p = self.banner(p).shift(DOWN * 0.9)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
         box = RoundedRectangle(width=11.6, height=2.8, corner_radius=0.25).to_edge(DOWN).shift(UP * 0.2)
         box.set_fill(opacity=0.06).set_stroke(width=3)
 
-        l1 = T(self.cfg, self.s, "• Different people → different hand spans/steps.", "• أشخاص مختلفون → قياسات مختلفة بالخطوة/الكف.", scale=0.52)
-        l2 = T(self.cfg, self.s, "• So results differ.", "• لذلك تختلف النتائج.", scale=0.52)
-        l3 = T(self.cfg, self.s, "• We agree on one standard unit.", "• نتفق على وحدة معيارية واحدة.", scale=0.52)
+        l1 = self.t("• Different people → different hand spans/steps.", "• أشخاص مختلفون → قياسات مختلفة بالخطوة/الكف.", scale=0.52)
+        l2 = self.t("• So results differ.", "• لذلك تختلف النتائج.", scale=0.52)
+        l3 = self.t("• We agree on one standard unit.", "• نتفق على وحدة معيارية واحدة.", scale=0.52)
         scaff = VGroup(l1, l2, l3).arrange(DOWN, aligned_edge=LEFT, buff=0.18).move_to(box.get_center())
 
         self.play(Create(box), FadeIn(scaff, shift=UP * 0.1), run_time=self.s.rt_norm)
@@ -338,7 +306,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
         """
         Institutionalization: meter (m) as standard unit; iterate and count.
         """
-        p = T(self.cfg, self.s, self.cfg.prompt_meter_en, self.cfg.prompt_meter_ar, scale=0.58)
+        p = self.t(self.cfg.prompt_meter_en, self.cfg.prompt_meter_ar, scale=0.58)
         p = self.banner(p).shift(DOWN * 0.9)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -361,7 +329,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
         self.play(meter.animate.shift(UP * 0.0), run_time=0.3)
 
         # Repeat meter along object until end
-        p2 = T(self.cfg, self.s, self.cfg.prompt_repeat_en, self.cfg.prompt_repeat_ar, scale=0.58)
+        p2 = self.t(self.cfg.prompt_repeat_en, self.cfg.prompt_repeat_ar, scale=0.58)
         p2 = self.banner(p2).shift(DOWN * 0.9)
         self.play(Transform(self.title, p2), run_time=self.s.rt_fast)
 
@@ -383,7 +351,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
             meter_copies.add(m)
 
         # animate placing them one by one + counter
-        p3 = T(self.cfg, self.s, self.cfg.prompt_count_en, self.cfg.prompt_count_ar, scale=0.58)
+        p3 = self.t(self.cfg.prompt_count_en, self.cfg.prompt_count_ar, scale=0.58)
         p3 = self.banner(p3).shift(DOWN * 0.9)
 
         for i, m in enumerate(meter_copies, start=1):
@@ -404,7 +372,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
             self.play(FadeOut(counters[-1]), run_time=0.2)
 
         # Reveal final measurement label: "X m"
-        p4 = T(self.cfg, self.s, self.cfg.prompt_label_en, self.cfg.prompt_label_ar, scale=0.58)
+        p4 = self.t(self.cfg.prompt_label_en, self.cfg.prompt_label_ar, scale=0.58)
         p4 = self.banner(p4).shift(DOWN * 0.9)
         self.play(Transform(self.title, p4), run_time=self.s.rt_fast)
 
@@ -412,7 +380,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
         self.play(Write(label), run_time=self.s.rt_norm)
 
         # Validate alignment message
-        p5 = T(self.cfg, self.s, self.cfg.prompt_validate_en, self.cfg.prompt_validate_ar, scale=0.56)
+        p5 = self.t(self.cfg.prompt_validate_en, self.cfg.prompt_validate_ar, scale=0.56)
         p5.to_edge(DOWN)
         self.play(FadeIn(p5, shift=UP * 0.1), run_time=self.s.rt_fast)
         self.wait(0.4)
@@ -425,8 +393,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
         """
         Formative: measure another object and pick correct label.
         """
-        prompt = T(
-            self.cfg, self.s,
+        prompt = self.t(
             "Mini-check: How many meters long is this object?",
             "تحقق صغير: كم متر طول هذا الشيء؟",
             scale=0.58
@@ -467,7 +434,7 @@ class M3_L14_MeterUnitMeasurement(Scene):
 
         # reveal correct option
         box = SurroundingRectangle(o2, buff=0.12)
-        ok = T(self.cfg, self.s, "Correct: 3 m", "صحيح: 3 m", scale=0.56).to_edge(DOWN)
+        ok = self.t("Correct: 3 m", "صحيح: 3 m", scale=0.56).to_edge(DOWN)
         self.play(Create(box), FadeIn(ok, shift=UP * 0.1), run_time=self.s.rt_norm)
         self.wait(0.4)
 
@@ -475,22 +442,22 @@ class M3_L14_MeterUnitMeasurement(Scene):
 
     def step_outro(self):
         recap = VGroup(
-            T(self.cfg, self.s, "Recap:", "الخلاصة:", scale=0.6),
-            T(self.cfg, self.s, "• Meter (m) is a standard unit of length", "• المتر (m) وحدة معيارية للطول", scale=0.50),
-            T(self.cfg, self.s, "• Always align at the start and end", "• دائماً نحاذي البداية والنهاية", scale=0.50),
-            T(self.cfg, self.s, "• Repeat the unit and count", "• نكرر الوحدة ونعدّ", scale=0.50),
-            T(self.cfg, self.s, "• Write: value + m", "• نكتب: عدد + m", scale=0.50),
+            self.t("Recap:", "الخلاصة:", scale=0.6),
+            self.t("• Meter (m) is a standard unit of length", "• المتر (m) وحدة معيارية للطول", scale=0.50),
+            self.t("• Always align at the start and end", "• دائماً نحاذي البداية والنهاية", scale=0.50),
+            self.t("• Repeat the unit and count", "• نكرر الوحدة ونعدّ", scale=0.50),
+            self.t("• Write: value + m", "• نكتب: عدد + m", scale=0.50),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.18)
 
         recap.to_edge(RIGHT).shift(DOWN * 0.15)
         self.play(FadeIn(recap, shift=LEFT * 0.2), run_time=self.s.rt_norm)
         self.wait(0.6)
-        self.play(FadeOut(recap, shift=RIGHT * 0.2), FadeOut(self.title), run_time=self.s.rt_fast)
+        self.play(FadeOut(recap, shift=RIGHT * 0.2), run_time=self.s.rt_fast)
 
 
 # ============================================================
 # RUN:
-#   manim -pqh your_file.py M3_L14_MeterUnitMeasurement
+#   manim -pqh M3_L14_MeterUnitMeasurement.py M3_L14_MeterUnitMeasurement
 #
 # CUSTOMIZE OBJECTS:
 #   cfg = LessonConfigM3_L14(
