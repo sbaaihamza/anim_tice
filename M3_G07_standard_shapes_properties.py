@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Callable, Dict, Literal
+from typing import List, Tuple
 
 import numpy as np
 from manim import *
+
+from anim_tice.core import AnimTiceScene, LessonConfig, StyleConfig
 
 
 # ============================================================
@@ -12,7 +14,7 @@ from manim import *
 # ============================================================
 
 @dataclass
-class ShapePropsStyle:
+class ShapePropsStyle(StyleConfig):
     # geometry visuals
     stroke_width: float = 5.0
     fill_opacity: float = 0.10
@@ -20,14 +22,9 @@ class ShapePropsStyle:
     vertex_radius: float = 0.10
 
     # text
-    font_size_title: int = 38
-    font_size_main: int = 34
     font_size_small: int = 28
 
     # pacing
-    pause: float = 0.45
-    rt_fast: float = 0.7
-    rt_norm: float = 1.0
     rt_slow: float = 1.25
 
     # toggles
@@ -54,12 +51,11 @@ class ShapeSpec:
 
 
 @dataclass
-class LessonConfigM3_G07:
+class LessonConfigM3_G07(LessonConfig):
     title_en: str = "Properties of standard geometric shapes"
     title_ar: str = "خاصيات الأشكال الهندسية الاعتيادية"
     domain_en: str = "Geometry"
     domain_ar: str = "الهندسة"
-    language: str = "en"
 
     # prompts (property language)
     p_display_en: str = "Look at the shape."
@@ -131,11 +127,6 @@ class LessonConfigM3_G07:
 # ============================================================
 # HELPERS
 # ============================================================
-
-def T(cfg: LessonConfigM3_G07, s: ShapePropsStyle, en: str, ar: Optional[str] = None, scale: float = 0.6) -> Mobject:
-    txt = en if cfg.language == "en" else (ar or en)
-    return Text(txt, font_size=s.font_size_main).scale(scale)
-
 
 def polygon_from_spec(spec: ShapeSpec, style: ShapePropsStyle) -> Polygon:
     poly = Polygon(*spec.vertices)
@@ -225,7 +216,7 @@ def classification_strip(items: List[Tuple[str, int, int]], style: ShapePropsSty
 # MAIN SCENE
 # ============================================================
 
-class M3_G07_StandardShapes_Properties(Scene):
+class M3_G07_StandardShapes_Properties(AnimTiceScene):
     """
     M3_G07 — Properties of standard geometric shapes
       display shape → highlight sides → highlight angles → compare with others → classify by invariants
@@ -233,42 +224,32 @@ class M3_G07_StandardShapes_Properties(Scene):
 
     def __init__(
         self,
-        cfg: LessonConfigM3_G07 = LessonConfigM3_G07(),
-        style: ShapePropsStyle = ShapePropsStyle(),
+        lesson_config: LessonConfigM3_G07 = LessonConfigM3_G07(),
+        style_config: ShapePropsStyle = ShapePropsStyle(),
         **kwargs
     ):
-        super().__init__(**kwargs)
-        self.cfg = cfg
-        self.s = style
+        super().__init__(
+            lesson_config=lesson_config,
+            style_config=style_config,
+            **kwargs
+        )
 
-    def banner(self, mob: Mobject) -> Mobject:
-        mob.to_edge(UP)
-        return mob
-
-    def construct(self):
-        # intro
-        title = T(self.cfg, self.s, self.cfg.title_en, self.cfg.title_ar, scale=0.58)
-        title = self.banner(title)
-        self.play(Write(title), run_time=self.s.rt_norm)
-        self.title = title
-
-        # cycle through shapes: observe → count sides/vertices → highlight angles
+    def build_steps(self):
+        self.steps = [("intro", self.step_intro)]
         summary: List[Tuple[str, int, int]] = []
         for spec in self.cfg.shapes:
-            summary.append(self.show_shape_properties(spec))
+            self.steps.append(
+                (f"show_{spec.sid}", lambda spec=spec: summary.append(self.show_shape_properties(spec)))
+            )
+        self.steps.append(("compare_and_classify", lambda: self.compare_and_classify(summary)))
 
-        # comparison + classification
-        self.compare_and_classify(summary)
-
-        self.play(FadeOut(self.title), run_time=self.s.rt_fast)
-
-    # ============================================================
-    # Core steps per shape
-    # ============================================================
+    def step_intro(self):
+        # The base class handles the title, so this can be a placeholder or for additional intro animations.
+        pass
 
     def show_shape_properties(self, spec: ShapeSpec) -> Tuple[str, int, int]:
         # prompt: display
-        prompt = T(self.cfg, self.s, self.cfg.p_display_en, self.cfg.p_display_ar, scale=0.54)
+        prompt = self.t(self.cfg.p_display_en, self.cfg.p_display_ar, scale=0.54)
         prompt = self.banner(prompt).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, prompt), run_time=self.s.rt_fast)
 
@@ -285,7 +266,7 @@ class M3_G07_StandardShapes_Properties(Scene):
 
         # highlight sides (counting)
         if self.s.show_side_markers:
-            prompt2 = T(self.cfg, self.s, self.cfg.p_sides_en, self.cfg.p_sides_ar, scale=0.54)
+            prompt2 = self.t(self.cfg.p_sides_en, self.cfg.p_sides_ar, scale=0.54)
             prompt2 = self.banner(prompt2).shift(DOWN * self.s.title_y_shift)
             self.play(Transform(self.title, prompt2), run_time=self.s.rt_fast)
 
@@ -307,7 +288,7 @@ class M3_G07_StandardShapes_Properties(Scene):
 
         # vertices
         if self.s.show_vertex_markers:
-            prompt3 = T(self.cfg, self.s, self.cfg.p_vertices_en, self.cfg.p_vertices_ar, scale=0.54)
+            prompt3 = self.t(self.cfg.p_vertices_en, self.cfg.p_vertices_ar, scale=0.54)
             prompt3 = self.banner(prompt3).shift(DOWN * self.s.title_y_shift)
             self.play(Transform(self.title, prompt3), run_time=self.s.rt_fast)
 
@@ -318,7 +299,7 @@ class M3_G07_StandardShapes_Properties(Scene):
 
         # angles
         if self.s.show_angle_markers:
-            prompt4 = T(self.cfg, self.s, self.cfg.p_angles_en, self.cfg.p_angles_ar, scale=0.54)
+            prompt4 = self.t(self.cfg.p_angles_en, self.cfg.p_angles_ar, scale=0.54)
             prompt4 = self.banner(prompt4).shift(DOWN * self.s.title_y_shift)
             self.play(Transform(self.title, prompt4), run_time=self.s.rt_fast)
 
@@ -343,13 +324,9 @@ class M3_G07_StandardShapes_Properties(Scene):
 
         return (name, n_sides, n_vertices)
 
-    # ============================================================
-    # Comparison / classification
-    # ============================================================
-
     def compare_and_classify(self, summary: List[Tuple[str, int, int]]):
         # prompt compare
-        prompt = T(self.cfg, self.s, self.cfg.p_compare_en, self.cfg.p_compare_ar, scale=0.54)
+        prompt = self.t(self.cfg.p_compare_en, self.cfg.p_compare_ar, scale=0.54)
         prompt = self.banner(prompt).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, prompt), run_time=self.s.rt_fast)
 
@@ -366,7 +343,7 @@ class M3_G07_StandardShapes_Properties(Scene):
 
         # classification strip (table-like)
         if self.s.show_classification_step:
-            prompt2 = T(self.cfg, self.s, self.cfg.p_classify_en, self.cfg.p_classify_ar, scale=0.54)
+            prompt2 = self.t(self.cfg.p_classify_en, self.cfg.p_classify_ar, scale=0.54)
             prompt2 = self.banner(prompt2).shift(DOWN * self.s.title_y_shift)
             self.play(Transform(self.title, prompt2), run_time=self.s.rt_fast)
 
@@ -389,7 +366,7 @@ class M3_G07_StandardShapes_Properties(Scene):
 
 # ============================================================
 # RUN:
-#   manim -pqh your_file.py M3_G07_StandardShapes_Properties
+#   manim -pqh M3_G07_StandardShapes_Properties.py M3_G07_StandardShapes_Properties
 #
 # EXTEND:
 #   - Add more ShapeSpec entries (hexagon, rhombus, etc.).

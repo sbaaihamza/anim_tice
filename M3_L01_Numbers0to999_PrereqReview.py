@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Callable
+from typing import List, Dict
 
 import numpy as np
 from manim import *
+
+from anim_tice.core import AnimTiceScene, LessonConfig, StyleConfig
 
 
 # ============================================================
@@ -12,21 +14,16 @@ from manim import *
 # ============================================================
 
 @dataclass
-class BaseTenStyle:
+class BaseTenStyle(StyleConfig):
     # block sizing
     unit_size: float = 0.42
     stroke_width: float = 3.0
     fill_opacity: float = 0.12
 
     # text sizes
-    font_size_title: int = 38
-    font_size_main: int = 34
     font_size_small: int = 28
 
     # pacing
-    pause: float = 0.45
-    rt_fast: float = 0.7
-    rt_norm: float = 1.0
     rt_slow: float = 1.2
 
     # toggles
@@ -42,14 +39,12 @@ class BaseTenStyle:
 
 
 @dataclass
-class LessonConfigM3_L01:
+class LessonConfigM3_L01(LessonConfig):
     # Example numbers for prerequisite review
     examples: List[int] = field(default_factory=lambda: [275, 509, 903, 118])
     # scene title
     title_en: str = "Numbers 0 to 999 — Prerequisite review"
     title_ar: str = "الأعداد من 0 إلى 999 — مراجعة المستلزمات"
-    # language
-    language: str = "en"  # "en" or "ar"
 
     # guided questioning (verbal layer)
     prompt_observe_en: str = "Observe: what do you notice about this number?"
@@ -177,7 +172,7 @@ def number_to_digits(n: int) -> Tuple[int, int, int]:
 # LESSON SCENE (Reusable / Adjustable / Extensible)
 # ============================================================
 
-class M3_L01_Numbers0to999_PrereqReview(Scene):
+class M3_L01_Numbers0to999_PrereqReview(AnimTiceScene):
     """
     M3_L01 — Numbers from 0 to 999 — prerequisite review
 
@@ -191,25 +186,16 @@ class M3_L01_Numbers0to999_PrereqReview(Scene):
 
     def __init__(
         self,
-        cfg: LessonConfigM3_L01 = LessonConfigM3_L01(),
-        style: BaseTenStyle = BaseTenStyle(),
+        lesson_config: LessonConfigM3_L01 = LessonConfigM3_L01(),
+        style_config: BaseTenStyle = BaseTenStyle(),
         **kwargs
     ):
-        super().__init__(**kwargs)
-        self.cfg = cfg
-        self.s = style
+        super().__init__(
+            lesson_config=lesson_config,
+            style_config=style_config,
+            **kwargs
+        )
         self.blocks_factory = BaseTenBlocks(style=self.s)
-        self.steps: List[Tuple[str, Callable[[], None]]] = []
-
-    # ----------------------------
-    # Orchestrator
-    # ----------------------------
-
-    def construct(self):
-        self.build_steps()
-        for _, fn in self.steps:
-            fn()
-            self.wait(self.s.pause)
 
     def build_steps(self):
         self.steps = [
@@ -221,18 +207,6 @@ class M3_L01_Numbers0to999_PrereqReview(Scene):
             ("mini_assessment", self.step_mini_assessment),
             ("outro", self.step_outro),
         ]
-
-    # ----------------------------
-    # Helpers
-    # ----------------------------
-
-    def t(self, en: str, ar: Optional[str] = None, scale: float = 0.6) -> Mobject:
-        txt = en if self.cfg.language == "en" else (ar or en)
-        return Text(txt, font_size=self.s.font_size_main).scale(scale)
-
-    def top(self, mob: Mobject) -> Mobject:
-        mob.to_edge(UP)
-        return mob
 
     def show_number_line(self):
         if not self.s.show_number_line:
@@ -247,25 +221,16 @@ class M3_L01_Numbers0to999_PrereqReview(Scene):
         nl.to_edge(DOWN).shift(UP * 0.35)
         return nl
 
-    # ============================================================
-    # Steps
-    # ============================================================
-
     def step_intro(self):
-        title = self.t(self.cfg.title_en, self.cfg.title_ar, scale=0.62)
-        title = self.top(title)
-
         didactic = self.t(
             "Observe • Compare • Hypothesize",
             "لاحظ • قارن • افترض",
             scale=0.52,
-        ).next_to(title, DOWN, buff=0.18)
+        ).next_to(self.title, DOWN, buff=0.18)
 
-        self.play(Write(title), FadeIn(didactic, shift=DOWN * 0.15), run_time=self.s.rt_norm)
+        self.play(FadeIn(didactic, shift=DOWN * 0.15), run_time=self.s.rt_norm)
         self.wait(0.2)
         self.play(FadeOut(didactic, shift=UP * 0.1), run_time=self.s.rt_fast)
-
-        self.title = title
 
         nl = self.show_number_line()
         if nl:
@@ -459,14 +424,13 @@ class M3_L01_Numbers0to999_PrereqReview(Scene):
             FadeOut(self.cards) if hasattr(self, "cards") else AnimationGroup(),
             FadeOut(self.arrow) if hasattr(self, "arrow") else AnimationGroup(),
             FadeOut(self.number_line) if self.number_line else AnimationGroup(),
-            FadeOut(self.title),
             run_time=self.s.rt_fast,
         )
 
 
 # ============================================================
 # RUN:
-#   manim -pqh your_file.py M3_L01_Numbers0to999_PrereqReview
+#   manim -pqh M3_L01_Numbers0to999_PrereqReview.py M3_L01_Numbers0to999_PrereqReview
 #
 # CUSTOMIZE:
 #   cfg = LessonConfigM3_L01(examples=[342, 507, 980], language="ar")
