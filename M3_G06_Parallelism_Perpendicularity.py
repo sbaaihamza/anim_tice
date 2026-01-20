@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Callable, Tuple, Dict, Literal
+from typing import List, Optional, Literal
 
 import numpy as np
 from manim import *
+
+from anim_tice.core import AnimTiceScene, LessonConfig, StyleConfig
 
 
 # ============================================================
@@ -12,7 +14,7 @@ from manim import *
 # ============================================================
 
 @dataclass
-class LinesRelStyle:
+class LinesRelStyle(StyleConfig):
     # line look
     line_stroke: float = 7.0
     aux_stroke: float = 4.0
@@ -22,14 +24,9 @@ class LinesRelStyle:
     right_angle_size: float = 0.35
 
     # text
-    font_size_title: int = 38
-    font_size_main: int = 34
     font_size_small: int = 28
 
     # pacing
-    pause: float = 0.45
-    rt_fast: float = 0.7
-    rt_norm: float = 1.0
     rt_slow: float = 1.25
 
     # toggles
@@ -49,12 +46,11 @@ class LinesRelStyle:
 
 
 @dataclass
-class LessonConfigM3_G06:
+class LessonConfigM3_G06(LessonConfig):
     title_en: str = "Identifying line positions – parallelism and perpendicularity"
     title_ar: str = "تعرف أوضاع المستقيمات – التوازي والتعامد"
     domain_en: str = "Geometry"
     domain_ar: str = "الهندسة"
-    language: str = "en"
 
     # prompts
     p_explore_en: str = "Exploration: observe line behaviors when we extend them."
@@ -83,11 +79,6 @@ class LessonConfigM3_G06:
 # ============================================================
 # HELPERS
 # ============================================================
-
-def T(cfg: LessonConfigM3_G06, s: LinesRelStyle, en: str, ar: Optional[str] = None, scale: float = 0.6) -> Mobject:
-    txt = en if cfg.language == "en" else (ar or en)
-    return Text(txt, font_size=s.font_size_main).scale(scale)
-
 
 def make_infinite_like_line(p1: np.ndarray, p2: np.ndarray, length: float = 10.0) -> Line:
     """
@@ -174,7 +165,7 @@ def mini_real_world_hint(kind: Literal["rails", "cross"], s: LinesRelStyle) -> V
 # MAIN SCENE
 # ============================================================
 
-class M3_G06_Parallelism_Perpendicularity(Scene):
+class M3_G06_Parallelism_Perpendicularity(AnimTiceScene):
     """
     M3_G06 — Identify line positions:
       - Parallel lines: extend → never meet
@@ -187,64 +178,39 @@ class M3_G06_Parallelism_Perpendicularity(Scene):
 
     def __init__(
         self,
-        cfg: LessonConfigM3_G06 = LessonConfigM3_G06(),
-        style: LinesRelStyle = LinesRelStyle(),
+        lesson_config: LessonConfigM3_G06 = LessonConfigM3_G06(),
+        style_config: LinesRelStyle = LinesRelStyle(),
         **kwargs
     ):
-        super().__init__(**kwargs)
-        self.cfg = cfg
-        self.s = style
+        super().__init__(
+            lesson_config=lesson_config,
+            style_config=style_config,
+            **kwargs
+        )
 
-    def banner(self, mob: Mobject) -> Mobject:
-        mob.to_edge(UP)
-        return mob
+    def build_steps(self):
+        self.steps = [
+            ("intro", self.step_intro),
+            ("parallel_demo", lambda: self.demo_parallel(y=self.s.demo_y_top)),
+            ("intersect_demo", lambda: self.demo_intersect(y=self.s.demo_y_mid)),
+            ("perpendicular_demo", lambda: self.demo_perpendicular(y=self.s.demo_y_bot)),
+            ("institutionalization", self.institutionalization_panel),
+        ]
+        if self.s.show_classifier:
+            self.steps.append(("classifier_check", self.classifier_check))
 
-    def construct(self):
-        # title
-        title = T(self.cfg, self.s, self.cfg.title_en, self.cfg.title_ar, scale=0.58)
-        title = self.banner(title)
-        self.play(Write(title), run_time=self.s.rt_norm)
-        self.title = title
-
+    def step_intro(self):
         if self.s.show_grid:
             grid = NumberPlane().set_opacity(0.15)
             self.add(grid)
 
-        # Exploration prompt
-        prompt = T(self.cfg, self.s, self.cfg.p_explore_en, self.cfg.p_explore_ar, scale=0.48)
+        prompt = self.t(self.cfg.p_explore_en, self.cfg.p_explore_ar, scale=0.48)
         prompt = self.banner(prompt).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, prompt), run_time=self.s.rt_fast)
 
-        # 1) Parallel demo (top)
-        g1 = self.demo_parallel(y=self.s.demo_y_top)
-
-        # 2) Intersecting demo (middle)
-        g2 = self.demo_intersect(y=self.s.demo_y_mid)
-
-        # 3) Perpendicular demo (bottom)
-        g3 = self.demo_perpendicular(y=self.s.demo_y_bot)
-
-        # Institutionalization summary
-        inst = self.institutionalization_panel()
-        self.play(FadeIn(inst, shift=UP * 0.08), run_time=self.s.rt_norm)
-        self.wait(0.45)
-
-        # classification quick check
-        if self.s.show_classifier:
-            self.classifier_check([g1, g2, g3])
-        self.play(FadeOut(inst), run_time=self.s.rt_fast)
-
-        # cleanup
-        self.play(FadeOut(VGroup(g1, g2, g3)), run_time=self.s.rt_fast)
-        self.play(FadeOut(self.title), run_time=self.s.rt_fast)
-
-    # ============================================================
-    # Demos
-    # ============================================================
-
     def demo_parallel(self, y: float = 1.4) -> VGroup:
         # prompt
-        p = T(self.cfg, self.s, self.cfg.p_parallel_en, self.cfg.p_parallel_ar, scale=0.52)
+        p = self.t(self.cfg.p_parallel_en, self.cfg.p_parallel_ar, scale=0.52)
         p = self.banner(p).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -279,11 +245,10 @@ class M3_G06_Parallelism_Perpendicularity(Scene):
         dot_far = Dot(point=center + RIGHT*5.4, radius=0.06).set_opacity(0.25)
         self.play(FadeIn(dot_far), run_time=self.s.rt_fast)
         self.play(FadeOut(dot_far), run_time=self.s.rt_fast)
-
-        return VGroup(l1, l2, label, sym, hint)
+        self.g1 = VGroup(l1, l2, label, sym, hint)
 
     def demo_intersect(self, y: float = 0.1) -> VGroup:
-        p = T(self.cfg, self.s, self.cfg.p_intersect_en, self.cfg.p_intersect_ar, scale=0.52)
+        p = self.t(self.cfg.p_intersect_en, self.cfg.p_intersect_ar, scale=0.52)
         p = self.banner(p).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -312,11 +277,10 @@ class M3_G06_Parallelism_Perpendicularity(Scene):
             self.play(FadeIn(meet, shift=UP*0.03), run_time=self.s.rt_fast)
 
         self.play(FadeIn(label, shift=UP*0.05), run_time=self.s.rt_fast)
-
-        return VGroup(l1, l2, meet, label)
+        self.g2 = VGroup(l1, l2, meet, label)
 
     def demo_perpendicular(self, y: float = -1.4) -> VGroup:
-        p = T(self.cfg, self.s, self.cfg.p_perp_en, self.cfg.p_perp_ar, scale=0.52)
+        p = self.t(self.cfg.p_perp_en, self.cfg.p_perp_ar, scale=0.52)
         p = self.banner(p).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -362,15 +326,10 @@ class M3_G06_Parallelism_Perpendicularity(Scene):
         if sym:
             sym.next_to(label if label else base_line, RIGHT, buff=0.25)
         self.play(FadeIn(label, shift=UP*0.05), FadeIn(sym, shift=UP*0.05), run_time=self.s.rt_fast)
-
-        return VGroup(base_line, rot_line, marker, label, sym, hint)
-
-    # ============================================================
-    # Institutionalization + Classifier
-    # ============================================================
+        self.g3 = VGroup(base_line, rot_line, marker, label, sym, hint)
 
     def institutionalization_panel(self) -> VGroup:
-        p = T(self.cfg, self.s, self.cfg.p_institution_en, self.cfg.p_institution_ar, scale=0.50)
+        p = self.t(self.cfg.p_institution_en, self.cfg.p_institution_ar, scale=0.50)
         p = self.banner(p).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -393,10 +352,13 @@ class M3_G06_Parallelism_Perpendicularity(Scene):
             .arrange(DOWN, aligned_edge=LEFT, buff=0.14) \
             .move_to(box.get_center())
 
-        return VGroup(box, txt)
+        inst = VGroup(box, txt)
+        self.play(FadeIn(inst, shift=UP * 0.08), run_time=self.s.rt_norm)
+        self.wait(0.45)
+        self.play(FadeOut(inst), run_time=self.s.rt_fast)
 
-    def classifier_check(self, demos: List[VGroup]):
-        p = T(self.cfg, self.s, self.cfg.p_classify_en, self.cfg.p_classify_ar, scale=0.52)
+    def classifier_check(self):
+        p = self.t(self.cfg.p_classify_en, self.cfg.p_classify_ar, scale=0.52)
         p = self.banner(p).shift(DOWN * self.s.title_y_shift)
         self.play(Transform(self.title, p), run_time=self.s.rt_fast)
 
@@ -421,17 +383,18 @@ class M3_G06_Parallelism_Perpendicularity(Scene):
             self.play(m.animate.set_opacity(0.35), run_time=0.15)
             self.play(m.animate.set_opacity(1.0), run_time=0.15)
 
-        flash(demos[0]); flash(cards[0])
-        flash(demos[1]); flash(cards[1])
-        flash(demos[2]); flash(cards[2])
+        flash(self.g1); flash(cards[0])
+        flash(self.g2); flash(cards[1])
+        flash(self.g3); flash(cards[2])
 
         self.wait(0.25)
         self.play(FadeOut(cards), run_time=self.s.rt_fast)
+        self.play(FadeOut(VGroup(self.g1, self.g2, self.g3)), run_time=self.s.rt_fast)
 
 
 # ============================================================
 # RUN:
-#   manim -pqh your_file.py M3_G06_Parallelism_Perpendicularity
+#   manim -pqh M3_G06_Parallelism_Perpendicularity.py M3_G06_Parallelism_Perpendicularity
 #
 # EXTEND IDEAS:
 #   - Add a "near-parallel" case that intersects far away, to reinforce "extend" idea.
